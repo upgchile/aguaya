@@ -8,7 +8,10 @@ import { Package, Truck, DollarSign, Droplets, LogOut } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { useAuth } from "@/lib/hooks/use-auth";
-import { useRepartidor } from "@/lib/hooks/use-repartidor";
+import {
+  RepartidorProvider,
+  useRepartidor,
+} from "@/lib/hooks/use-repartidor";
 import { signOut } from "@/lib/auth-actions";
 import { toggleRepartidorStatus } from "@/lib/actions/repartidor-actions";
 import { toast } from "sonner";
@@ -24,9 +27,17 @@ export default function RepartidorLayout({
 }: {
   children: React.ReactNode;
 }) {
+  return (
+    <RepartidorProvider>
+      <RepartidorShell>{children}</RepartidorShell>
+    </RepartidorProvider>
+  );
+}
+
+function RepartidorShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { name } = useAuth();
-  const { repartidor } = useRepartidor();
+  const { repartidor, setRepartidor } = useRepartidor();
   const [toggling, setToggling] = useState(false);
 
   const isDisponible = repartidor?.status === "disponible";
@@ -38,11 +49,22 @@ export default function RepartidorLayout({
       return;
     }
 
-    setToggling(true);
     const newStatus = checked ? "disponible" : "offline";
+    const previousStatus = repartidor?.status;
+
+    // Optimistic update
+    if (repartidor) {
+      setRepartidor({ ...repartidor, status: newStatus });
+    }
+
+    setToggling(true);
     const result = await toggleRepartidorStatus(newStatus);
 
     if (result.error) {
+      // Revert on error
+      if (repartidor && previousStatus) {
+        setRepartidor({ ...repartidor, status: previousStatus });
+      }
       toast.error("Error al cambiar estado", { description: result.error });
     }
     setToggling(false);

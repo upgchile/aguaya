@@ -57,13 +57,15 @@ export function useClientOrders() {
     };
   }, [user]);
 
+  // Active: in-progress orders OR delivered but not yet rated (so client can rate)
   const activeOrder = useMemo(
     () =>
       orders.find(
         (o) =>
           o.status === "pendiente" ||
           o.status === "asignado" ||
-          o.status === "en_camino"
+          o.status === "en_camino" ||
+          (o.status === "entregado" && o.rating == null)
       ) ?? null,
     [orders]
   );
@@ -71,7 +73,9 @@ export function useClientOrders() {
   const history = useMemo(
     () =>
       orders.filter(
-        (o) => o.status === "entregado" || o.status === "cancelado"
+        (o) =>
+          o.status === "cancelado" ||
+          (o.status === "entregado" && o.rating != null)
       ),
     [orders]
   );

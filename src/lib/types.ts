@@ -46,6 +46,7 @@ export interface Order {
   status: OrderStatus;
   scheduled_at?: string;
   accepted_at?: string;
+  rating?: number;
   delivered_at?: string;
   created_at: string;
   cliente?: User;

@@ -1,11 +1,26 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  type ReactNode,
+} from "react";
 import { createClient } from "@/lib/supabase/client";
 import type { Repartidor } from "@/lib/types";
 import { useAuth } from "./use-auth";
 
-export function useRepartidor() {
+interface RepartidorContextValue {
+  repartidor: Repartidor | null;
+  setRepartidor: (r: Repartidor | null) => void;
+  loading: boolean;
+  error: string | null;
+}
+
+const RepartidorContext = createContext<RepartidorContextValue | null>(null);
+
+export function RepartidorProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const [repartidor, setRepartidor] = useState<Repartidor | null>(null);
   const [loading, setLoading] = useState(true);
@@ -55,5 +70,19 @@ export function useRepartidor() {
     };
   }, [user]);
 
-  return { repartidor, loading, error };
+  return (
+    <RepartidorContext.Provider
+      value={{ repartidor, setRepartidor, loading, error }}
+    >
+      {children}
+    </RepartidorContext.Provider>
+  );
+}
+
+export function useRepartidor() {
+  const ctx = useContext(RepartidorContext);
+  if (!ctx) {
+    throw new Error("useRepartidor must be used within a RepartidorProvider");
+  }
+  return ctx;
 }

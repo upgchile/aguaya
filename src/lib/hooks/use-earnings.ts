@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { PAGO_REPARTIDOR } from "@/lib/types";
 import type { Order } from "@/lib/types";
 
 interface EarningsData {
@@ -13,6 +12,7 @@ interface EarningsData {
   weekDeliveries: number;
   monthDeliveries: number;
   recentOrders: Order[];
+  pagoRepartidor: number;
 }
 
 export function useEarnings(repartidorId: string | undefined) {
@@ -24,6 +24,7 @@ export function useEarnings(repartidorId: string | undefined) {
     weekDeliveries: 0,
     monthDeliveries: 0,
     recentOrders: [],
+    pagoRepartidor: 3000,
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -56,41 +57,60 @@ export function useEarnings(repartidorId: string | undefined) {
         1
       ).toISOString();
 
-      // Get all delivered orders for this repartidor this month
-      const { data: orders, error: err } = await supabase
+      // Get payments with order details for this repartidor this month
+      const { data: payments, error: payErr } = await supabase
+        .from("payments")
+        .select("monto_neto, created_at, order:orders(cantidad_bidones, delivered_at)")
+        .eq("repartidor_id", repartidorId!)
+        .gte("created_at", monthStart)
+        .order("created_at", { ascending: false });
+
+      if (payErr) {
+        setError(payErr.message);
+        setLoading(false);
+        return;
+      }
+
+      // Get delivered orders for the recent list
+      const { data: orders } = await supabase
         .from("orders")
         .select("*")
         .eq("repartidor_id", repartidorId!)
         .eq("status", "entregado")
         .gte("delivered_at", monthStart)
-        .order("delivered_at", { ascending: false });
+        .order("delivered_at", { ascending: false })
+        .limit(5);
 
-      if (err) {
-        setError(err.message);
-        setLoading(false);
-        return;
-      }
+      // Get pago_repartidor from platform_config
+      const { data: configRow } = await supabase
+        .from("platform_config")
+        .select("value")
+        .eq("key", "pago_repartidor")
+        .single();
 
-      const allOrders = (orders as Order[]) ?? [];
+      const pagoRepartidor = configRow ? Number(configRow.value) : 3000;
 
-      const todayOrders = allOrders.filter(
-        (o) => o.delivered_at && o.delivered_at >= todayStart
+      const allPayments = payments ?? [];
+
+      const todayPayments = allPayments.filter(
+        (p) => p.created_at >= todayStart
       );
-      const weekOrders = allOrders.filter(
-        (o) => o.delivered_at && o.delivered_at >= weekStart
+      const weekPayments = allPayments.filter(
+        (p) => p.created_at >= weekStart
       );
 
-      const calcEarnings = (list: Order[]) =>
-        list.reduce((sum, o) => sum + PAGO_REPARTIDOR * o.cantidad_bidones, 0);
+      const sumEarnings = (list: typeof allPayments) =>
+        list.reduce((sum, p) => sum + p.monto_neto, 0);
 
       setData({
-        today: calcEarnings(todayOrders),
-        week: calcEarnings(weekOrders),
-        month: calcEarnings(allOrders),
-        todayDeliveries: todayOrders.length,
-        weekDeliveries: weekOrders.length,
-        monthDeliveries: allOrders.length,
-        recentOrders: allOrders.slice(0, 5),
+        today: sumEarnings(todayPayments),
+        week: sumEarnings(weekPayments),
+        month: sumEarnings(allPayments),
+        todayDeliveries: todayPayments.length,
+        weekDeliveries: weekPayments.length,
+        monthDeliveries: allPayments.length,
+        recentOrders: (orders as Order[]) ?? [],
+        pagoRepartidor,
       });
       setLoading(false);
     }

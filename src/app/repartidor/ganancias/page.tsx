@@ -18,7 +18,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useRepartidor } from "@/lib/hooks/use-repartidor";
 import { useEarnings } from "@/lib/hooks/use-earnings";
-import { PAGO_REPARTIDOR } from "@/lib/types";
 
 function formatCLP(amount: number): string {
   return `$${amount.toLocaleString("es-CL")}`;
@@ -44,6 +43,7 @@ export default function GananciasPage() {
     weekDeliveries,
     monthDeliveries,
     recentOrders,
+    pagoRepartidor,
     loading: earningsLoading,
   } = useEarnings(repartidor?.id);
 
@@ -181,7 +181,7 @@ export default function GananciasPage() {
                   <span className="font-bold text-primary">
                     {formatCLP(DAILY_GOAL - today)}
                   </span>{" "}
-                  para alcanzar tu meta. ({Math.ceil((DAILY_GOAL - today) / PAGO_REPARTIDOR)} entregas más)
+                  para alcanzar tu meta. ({Math.ceil((DAILY_GOAL - today) / pagoRepartidor)} entregas más)
                 </p>
               </div>
             )}
@@ -265,7 +265,7 @@ export default function GananciasPage() {
             <div className="space-y-3">
               {recentOrders.length > 0 ? (
                 recentOrders.map((order, index) => {
-                  const earnings = PAGO_REPARTIDOR * order.cantidad_bidones;
+                  const earnings = pagoRepartidor * order.cantidad_bidones;
                   return (
                     <motion.div
                       key={order.id}
@@ -330,7 +330,7 @@ export default function GananciasPage() {
               <div className="flex items-center justify-between">
                 <span className="text-muted-foreground">Por cada bidón entregado</span>
                 <span className="font-semibold text-foreground">
-                  {formatCLP(PAGO_REPARTIDOR)}
+                  {formatCLP(pagoRepartidor)}
                 </span>
               </div>
               <div className="h-px bg-border" />
@@ -339,7 +339,7 @@ export default function GananciasPage() {
                   Ejemplo: 2 bidones
                 </span>
                 <span className="font-semibold text-green-600">
-                  {formatCLP(PAGO_REPARTIDOR * 2)}
+                  {formatCLP(pagoRepartidor * 2)}
                 </span>
               </div>
             </div>

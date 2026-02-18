@@ -16,6 +16,7 @@ import {
   ORDER_STATUS_COLORS,
 } from "@/lib/types";
 import { useClientOrders } from "@/lib/hooks/use-client-orders";
+import { RatingStars } from "@/components/rating-stars";
 
 function formatCLP(amount: number): string {
   return `$${amount.toLocaleString("es-CL")}`;
@@ -133,6 +134,14 @@ export default function HistorialPage() {
                         Entregado el{" "}
                         {formatDate(order.delivered_at)}
                       </span>
+                    </div>
+                  )}
+                  {order.status === "entregado" && (
+                    <div className="mt-2 border-t border-border/50 pt-2">
+                      <RatingStars
+                        orderId={order.id}
+                        existingRating={order.rating}
+                      />
                     </div>
                   )}
                 </CardContent>

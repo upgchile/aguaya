@@ -98,6 +98,28 @@ export async function advanceOrderStatus(orderId: string) {
   return { success: true, new_status: result.new_status };
 }
 
+export async function rateOrder(orderId: string, rating: number) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) return { error: "No autenticado" };
+
+  const { data, error } = await supabase.rpc("rate_order", {
+    p_order_id: orderId,
+    p_rating: rating,
+  });
+
+  if (error) return { error: error.message };
+
+  const result = data as { success: boolean; error?: string };
+  if (!result.success) return { error: result.error };
+
+  revalidatePath("/cliente");
+  return { success: true };
+}
+
 export async function cancelOrder(orderId: string) {
   const supabase = await createClient();
   const {

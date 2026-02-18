@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -26,11 +26,18 @@ function formatCLP(amount: number): string {
 
 export default function PedidosCercanosPage() {
   const router = useRouter();
-  const { orders, loading } = usePendingOrders();
+  const { orders, loading, refetch } = usePendingOrders();
   const { repartidor } = useRepartidor();
   const [acceptingId, setAcceptingId] = useState<string | null>(null);
 
   const isDisponible = repartidor?.status === "disponible";
+
+  // Refetch orders when repartidor becomes disponible
+  useEffect(() => {
+    if (isDisponible) {
+      refetch();
+    }
+  }, [isDisponible, refetch]);
 
   const handleAccept = async (orderId: string) => {
     setAcceptingId(orderId);

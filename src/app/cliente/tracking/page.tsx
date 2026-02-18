@@ -24,6 +24,7 @@ import {
 } from "@/lib/types";
 import type { OrderStatus } from "@/lib/types";
 import { useClientOrders } from "@/lib/hooks/use-client-orders";
+import { RatingStars } from "@/components/rating-stars";
 
 const STEPPER_STATUSES = [
   "pendiente",
@@ -309,6 +310,29 @@ export default function TrackingPage() {
           </CardContent>
         </Card>
       </motion.div>
+
+      {/* Rating Card - appears when delivered and not yet rated */}
+      {activeOrder.status === "entregado" && !activeOrder.rating && (
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, delay: 0.35 }}
+          className="mb-6 mt-4"
+        >
+          <Card className="border-0 border-l-4 border-l-amber-400 shadow-md">
+            <CardContent className="py-3">
+              <h3 className="mb-1 font-semibold text-foreground">
+                Califica tu experiencia
+              </h3>
+              <p className="mb-3 text-xs text-muted-foreground">
+                Como fue la entrega de{" "}
+                {activeOrder.repartidor?.user?.name ?? "tu repartidor"}?
+              </p>
+              <RatingStars orderId={activeOrder.id} />
+            </CardContent>
+          </Card>
+        </motion.div>
+      )}
     </div>
   );
 }
