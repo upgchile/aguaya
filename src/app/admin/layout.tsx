@@ -12,8 +12,9 @@ import {
   CreditCard,
   Droplets,
   LogOut,
-  ChevronDown,
 } from "lucide-react";
+import { useAuth } from "@/lib/hooks/use-auth";
+import { signOut } from "@/lib/auth-actions";
 
 const navItems = [
   { label: "Dashboard", href: "/admin", icon: LayoutDashboard },
@@ -28,6 +29,16 @@ export default function AdminLayout({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
+  const { name, loading } = useAuth();
+
+  const initials = name
+    ? name
+        .split(" ")
+        .map((n) => n[0])
+        .join("")
+        .toUpperCase()
+        .slice(0, 2)
+    : "AA";
 
   const isActive = (href: string) => {
     if (href === "/admin") return pathname === "/admin";
@@ -52,14 +63,24 @@ export default function AdminLayout({
             </Badge>
           </div>
 
-          {/* User dropdown placeholder */}
-          <Button variant="ghost" className="flex items-center gap-2 text-sm text-gray-600">
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-primary font-semibold text-xs">
-              AA
+          {/* User info + logout */}
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 text-sm text-gray-600">
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-primary font-semibold text-xs">
+                {loading ? "..." : initials}
+              </div>
+              <span className="hidden sm:inline">{loading ? "..." : name}</span>
             </div>
-            <span className="hidden sm:inline">Admin Aguaya</span>
-            <ChevronDown className="h-4 w-4" />
-          </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => signOut()}
+              className="text-muted-foreground hover:text-foreground"
+            >
+              <LogOut className="h-4 w-4" />
+              <span className="hidden sm:inline ml-1">Salir</span>
+            </Button>
+          </div>
         </div>
 
         {/* Horizontal tab navigation */}
@@ -98,7 +119,7 @@ export default function AdminLayout({
           key={pathname}
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.25, ease: "easeOut" }}
+          transition={{ duration: 0.25, ease: "easeOut" as const }}
         >
           {children}
         </motion.div>

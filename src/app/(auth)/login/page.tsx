@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import {
   Droplets,
@@ -11,9 +10,6 @@ import {
   Eye,
   EyeOff,
   ArrowRight,
-  User,
-  Truck,
-  ShieldCheck,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -26,9 +22,10 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { signIn } from "@/lib/auth-actions";
+import { toast } from "sonner";
 
 export default function LoginPage() {
-  const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -37,10 +34,22 @@ export default function LoginPage() {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    // MVP: simulate login delay then redirect
-    await new Promise((resolve) => setTimeout(resolve, 800));
-    setIsLoading(false);
-    router.push("/cliente");
+
+    const formData = new FormData();
+    formData.append("email", email);
+    formData.append("password", password);
+
+    const result = await signIn(formData);
+
+    if (result?.error) {
+      toast.error(
+        result.error === "Invalid login credentials"
+          ? "Correo o contraseña incorrectos"
+          : result.error
+      );
+      setIsLoading(false);
+    }
+    // If no error, the server action redirects automatically
   };
 
   return (
@@ -55,7 +64,7 @@ export default function LoginPage() {
       <motion.div
         initial={{ opacity: 0, y: 24 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, ease: "easeOut" }}
+        transition={{ duration: 0.5, ease: "easeOut" as const }}
         className="relative z-10 w-full max-w-md"
       >
         {/* Logo */}
@@ -181,53 +190,6 @@ export default function LoginPage() {
               </div>
             </CardContent>
           </Card>
-        </motion.div>
-
-        {/* Demo Access Section */}
-        <motion.div
-          initial={{ opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.4 }}
-          className="mt-6"
-        >
-          <div className="mb-4 flex items-center gap-3">
-            <div className="h-px flex-1 bg-border" />
-            <span className="text-xs font-medium text-muted-foreground">
-              Acceso demo
-            </span>
-            <div className="h-px flex-1 bg-border" />
-          </div>
-
-          <div className="grid grid-cols-3 gap-3">
-            <Button
-              variant="outline"
-              className="group flex h-auto flex-col gap-2 rounded-xl border-white/60 bg-white/50 py-4 shadow-sm backdrop-blur-sm transition-all hover:border-primary/20 hover:bg-primary/5 hover:shadow-md"
-              onClick={() => router.push("/cliente")}
-            >
-              <User className="size-5 text-muted-foreground transition-colors group-hover:text-primary" />
-              <span className="text-xs font-medium">Entrar como Cliente</span>
-            </Button>
-
-            <Button
-              variant="outline"
-              className="group flex h-auto flex-col gap-2 rounded-xl border-white/60 bg-white/50 py-4 shadow-sm backdrop-blur-sm transition-all hover:border-primary/20 hover:bg-primary/5 hover:shadow-md"
-              onClick={() => router.push("/repartidor")}
-            >
-              <Truck className="size-5 text-muted-foreground transition-colors group-hover:text-primary" />
-              <span className="text-xs font-medium">
-                Entrar como Repartidor
-              </span>
-            </Button>
-
-            <Button
-              variant="outline"
-              className="group flex h-auto flex-col gap-2 rounded-xl border-white/60 bg-white/50 py-4 shadow-sm backdrop-blur-sm transition-all hover:border-primary/20 hover:bg-primary/5 hover:shadow-md"
-              onClick={() => router.push("/admin")}
-            >
-              <ShieldCheck className="size-5 text-muted-foreground transition-colors group-hover:text-primary" />
-              <span className="text-xs font-medium">Entrar como Admin</span>
-            </Button>
-          </div>
         </motion.div>
       </motion.div>
     </div>

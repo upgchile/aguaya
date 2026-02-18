@@ -2,7 +2,7 @@
 
 import { useState, Suspense } from "react";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Droplets,
@@ -26,11 +26,12 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { signUp } from "@/lib/auth-actions";
+import { toast } from "sonner";
 
 type Role = "cliente" | "repartidor";
 
 function RegisterContent() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const preselectedRole = searchParams.get("role") as Role | null;
 
@@ -47,10 +48,25 @@ function RegisterContent() {
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    // MVP: simulate registration delay then redirect based on role
-    await new Promise((resolve) => setTimeout(resolve, 800));
-    setIsLoading(false);
-    router.push(role === "repartidor" ? "/repartidor" : "/cliente");
+
+    const formData = new FormData();
+    formData.append("name", name);
+    formData.append("email", email);
+    formData.append("phone", phone);
+    formData.append("password", password);
+    formData.append("role", role);
+
+    const result = await signUp(formData);
+
+    if (result?.error) {
+      toast.error(
+        result.error.includes("already registered")
+          ? "Este correo ya esta registrado"
+          : result.error
+      );
+      setIsLoading(false);
+    }
+    // If no error, the server action redirects automatically
   };
 
   return (
@@ -65,7 +81,7 @@ function RegisterContent() {
       <motion.div
         initial={{ opacity: 0, y: 24 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, ease: "easeOut" }}
+        transition={{ duration: 0.5, ease: "easeOut" as const }}
         className="relative z-10 w-full max-w-md"
       >
         {/* Logo */}
@@ -241,7 +257,6 @@ function RegisterContent() {
                       placeholder="9 1234 5678"
                       value={phone}
                       onChange={(e) => {
-                        // Only allow digits and spaces
                         const cleaned = e.target.value.replace(/[^\d\s]/g, "");
                         setPhone(cleaned);
                       }}

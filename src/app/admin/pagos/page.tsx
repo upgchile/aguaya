@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -20,8 +20,13 @@ import {
   Clock,
   BanknoteIcon,
   ArrowUpRight,
+  Loader2,
 } from "lucide-react";
-import { mockPayments, mockRepartidor } from "@/lib/mock-data";
+import { createClient } from "@/lib/supabase/client";
+import {
+  liquidatePayment,
+  liquidateAllPayments,
+} from "@/lib/actions/admin-actions";
 import type { Payment, PaymentStatus } from "@/lib/types";
 
 const PAYMENT_STATUS_LABELS: Record<PaymentStatus, string> = {
@@ -34,8 +39,39 @@ const PAYMENT_STATUS_COLORS: Record<PaymentStatus, string> = {
   pagado: "bg-green-100 text-green-800",
 };
 
+type PaymentWithRepartidor = Omit<Payment, 'repartidor'> & {
+  repartidor?: {
+    id: string;
+    user: { name: string } | null;
+  };
+};
+
 export default function PagosPage() {
-  const [payments, setPayments] = useState<Payment[]>(mockPayments);
+  const [payments, setPayments] = useState<PaymentWithRepartidor[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [liquidating, setLiquidating] = useState<string | null>(null);
+  const [liquidatingAll, setLiquidatingAll] = useState(false);
+
+  const fetchPayments = async () => {
+    const supabase = createClient();
+    const { data, error } = await supabase
+      .from("payments")
+      .select(
+        "*, repartidor:repartidores(id, user:profiles!repartidores_user_id_fkey(name))"
+      )
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      toast.error("Error cargando pagos", { description: error.message });
+    } else {
+      setPayments((data as PaymentWithRepartidor[]) ?? []);
+    }
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    fetchPayments();
+  }, []);
 
   const pendingTotal = useMemo(
     () =>
@@ -71,38 +107,40 @@ export default function PagosPage() {
     });
   };
 
-  const handleLiquidar = (paymentId: string) => {
-    setPayments((prev) =>
-      prev.map((p) =>
-        p.id === paymentId
-          ? { ...p, status: "pagado" as PaymentStatus, paid_at: new Date().toISOString() }
-          : p
-      )
-    );
-    toast.success("Pago liquidado exitosamente", {
-      description: `Liquidacion ${paymentId} procesada.`,
-    });
+  const handleLiquidar = async (paymentId: string) => {
+    setLiquidating(paymentId);
+    const result = await liquidatePayment(paymentId);
+
+    if (result.error) {
+      toast.error("Error al liquidar", { description: result.error });
+    } else {
+      toast.success("Pago liquidado exitosamente");
+      await fetchPayments();
+    }
+    setLiquidating(null);
   };
 
-  const handleLiquidarTodo = () => {
-    const pendientes = payments.filter((p) => p.status === "pendiente");
-    if (pendientes.length === 0) {
-      toast.info("No hay pagos pendientes por liquidar.");
-      return;
+  const handleLiquidarTodo = async () => {
+    setLiquidatingAll(true);
+    const result = await liquidateAllPayments();
+
+    if (result.error) {
+      toast.info(result.error);
+    } else {
+      toast.success(`${result.count} pagos liquidados`);
+      await fetchPayments();
     }
-    setPayments((prev) =>
-      prev.map((p) =>
-        p.status === "pendiente"
-          ? { ...p, status: "pagado" as PaymentStatus, paid_at: new Date().toISOString() }
-          : p
-      )
-    );
-    toast.success(`${pendientes.length} pagos liquidados`, {
-      description: `Total liquidado: ${formatCLP(
-        pendientes.reduce((sum, p) => sum + p.monto_neto, 0)
-      )}`,
-    });
+    setLiquidatingAll(false);
   };
+
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20">
+        <Loader2 className="size-8 animate-spin text-primary" />
+        <p className="mt-3 text-sm text-gray-500">Cargando pagos...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -119,9 +157,13 @@ export default function PagosPage() {
         <Button
           className="bg-primary hover:bg-primary/90"
           onClick={handleLiquidarTodo}
-          disabled={pendingCount === 0}
+          disabled={pendingCount === 0 || liquidatingAll}
         >
-          <BanknoteIcon className="mr-2 h-4 w-4" />
+          {liquidatingAll ? (
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+          ) : (
+            <BanknoteIcon className="mr-2 h-4 w-4" />
+          )}
           Liquidar Todo ({pendingCount})
         </Button>
       </div>
@@ -207,10 +249,10 @@ export default function PagosPage() {
                   {payments.map((payment) => (
                     <TableRow key={payment.id}>
                       <TableCell className="font-medium">
-                        {mockRepartidor.name}
+                        {payment.repartidor?.user?.name ?? "---"}
                       </TableCell>
                       <TableCell className="font-mono text-xs text-gray-500">
-                        {payment.order_id}
+                        {payment.order_id.slice(0, 8)}...
                       </TableCell>
                       <TableCell className="text-right">
                         {formatCLP(payment.monto_bruto)}
@@ -238,8 +280,13 @@ export default function PagosPage() {
                             variant="outline"
                             className="h-8 border-primary text-primary hover:bg-primary hover:text-white"
                             onClick={() => handleLiquidar(payment.id)}
+                            disabled={liquidating === payment.id}
                           >
-                            <ArrowUpRight className="mr-1 h-3 w-3" />
+                            {liquidating === payment.id ? (
+                              <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                            ) : (
+                              <ArrowUpRight className="mr-1 h-3 w-3" />
+                            )}
                             Liquidar
                           </Button>
                         ) : (

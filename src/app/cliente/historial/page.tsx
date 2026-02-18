@@ -7,15 +7,15 @@ import {
   Droplets,
   PackageCheck,
   InboxIcon,
+  Loader2,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
-  PRECIO_BIDON,
   ORDER_STATUS_LABELS,
   ORDER_STATUS_COLORS,
 } from "@/lib/types";
-import { mockOrders } from "@/lib/mock-data";
+import { useClientOrders } from "@/lib/hooks/use-client-orders";
 
 function formatCLP(amount: number): string {
   return `$${amount.toLocaleString("es-CL")}`;
@@ -33,7 +33,16 @@ function formatDate(dateStr: string): string {
 }
 
 export default function HistorialPage() {
-  const deliveredOrders = mockOrders.filter((o) => o.status === "entregado");
+  const { history, loading } = useClientOrders();
+
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20">
+        <Loader2 className="size-8 animate-spin text-primary" />
+        <p className="mt-3 text-sm text-muted-foreground">Cargando historial...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="px-4 pt-4">
@@ -50,7 +59,7 @@ export default function HistorialPage() {
         </p>
       </motion.div>
 
-      {deliveredOrders.length === 0 ? (
+      {history.length === 0 ? (
         /* Empty State */
         <motion.div
           initial={{ opacity: 0, scale: 0.95 }}
@@ -71,7 +80,7 @@ export default function HistorialPage() {
       ) : (
         /* Order List */
         <div className="mb-6 space-y-3">
-          {deliveredOrders.map((order, idx) => (
+          {history.map((order, idx) => (
             <motion.div
               key={order.id}
               initial={{ opacity: 0, y: 16 }}

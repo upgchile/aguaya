@@ -2,8 +2,10 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, MapPin, Clock, User } from "lucide-react";
+import { Home, MapPin, Clock, LogOut } from "lucide-react";
 import { motion } from "framer-motion";
+import { useAuth } from "@/lib/hooks/use-auth";
+import { signOut } from "@/lib/auth-actions";
 
 const tabs = [
   { label: "Pedir", href: "/cliente", icon: Home },
@@ -17,6 +19,16 @@ export default function ClienteLayout({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
+  const { name, loading } = useAuth();
+
+  const initials = name
+    ? name
+        .split(" ")
+        .map((n) => n[0])
+        .join("")
+        .toUpperCase()
+        .slice(0, 2)
+    : "?";
 
   return (
     <div className="flex min-h-dvh flex-col bg-background">
@@ -33,9 +45,18 @@ export default function ClienteLayout({
               Aguaya
             </span>
           </Link>
-          <button className="flex size-9 items-center justify-center rounded-full bg-muted transition-colors hover:bg-muted/80">
-            <User className="size-4 text-muted-foreground" />
-          </button>
+          <div className="flex items-center gap-2">
+            <div className="flex size-9 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">
+              {loading ? "..." : initials}
+            </div>
+            <button
+              onClick={() => signOut()}
+              className="flex size-9 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              title="Cerrar sesion"
+            >
+              <LogOut className="size-4" />
+            </button>
+          </div>
         </div>
       </header>
 

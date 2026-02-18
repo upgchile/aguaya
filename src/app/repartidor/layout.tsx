@@ -4,9 +4,14 @@ import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { Package, Truck, DollarSign, Droplets } from "lucide-react";
+import { Package, Truck, DollarSign, Droplets, LogOut } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
+import { useAuth } from "@/lib/hooks/use-auth";
+import { useRepartidor } from "@/lib/hooks/use-repartidor";
+import { signOut } from "@/lib/auth-actions";
+import { toggleRepartidorStatus } from "@/lib/actions/repartidor-actions";
+import { toast } from "sonner";
 
 const tabs = [
   { label: "Pedidos", href: "/repartidor", icon: Package },
@@ -20,7 +25,46 @@ export default function RepartidorLayout({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
-  const [disponible, setDisponible] = useState(true);
+  const { name } = useAuth();
+  const { repartidor } = useRepartidor();
+  const [toggling, setToggling] = useState(false);
+
+  const isDisponible = repartidor?.status === "disponible";
+  const isOcupado = repartidor?.status === "ocupado";
+
+  const handleToggle = async (checked: boolean) => {
+    if (isOcupado) {
+      toast.error("No puedes cambiar tu estado durante una entrega activa.");
+      return;
+    }
+
+    setToggling(true);
+    const newStatus = checked ? "disponible" : "offline";
+    const result = await toggleRepartidorStatus(newStatus);
+
+    if (result.error) {
+      toast.error("Error al cambiar estado", { description: result.error });
+    }
+    setToggling(false);
+  };
+
+  const statusLabel = isOcupado
+    ? "En entrega"
+    : isDisponible
+    ? "Disponible"
+    : "No disponible";
+
+  const statusDotClass = isOcupado
+    ? "bg-orange-500 animate-pulse"
+    : isDisponible
+    ? "bg-green-500 animate-pulse"
+    : "bg-gray-400";
+
+  const statusTextClass = isOcupado
+    ? "text-orange-600"
+    : isDisponible
+    ? "text-green-600"
+    : "text-muted-foreground";
 
   return (
     <div className="flex min-h-dvh flex-col bg-background">
@@ -42,7 +86,7 @@ export default function RepartidorLayout({
           <div className="flex items-center gap-2.5">
             <AnimatePresence mode="wait">
               <motion.div
-                key={disponible ? "on" : "off"}
+                key={repartidor?.status ?? "loading"}
                 initial={{ opacity: 0, x: 8 }}
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: -8 }}
@@ -50,24 +94,26 @@ export default function RepartidorLayout({
                 className="flex items-center gap-1.5"
               >
                 <span
-                  className={`inline-block size-2 rounded-full ${
-                    disponible ? "bg-green-500 animate-pulse" : "bg-gray-400"
-                  }`}
+                  className={`inline-block size-2 rounded-full ${statusDotClass}`}
                 />
-                <span
-                  className={`text-xs font-medium ${
-                    disponible ? "text-green-600" : "text-muted-foreground"
-                  }`}
-                >
-                  {disponible ? "Disponible" : "No disponible"}
+                <span className={`text-xs font-medium ${statusTextClass}`}>
+                  {statusLabel}
                 </span>
               </motion.div>
             </AnimatePresence>
             <Switch
-              checked={disponible}
-              onCheckedChange={setDisponible}
+              checked={isDisponible || isOcupado}
+              onCheckedChange={handleToggle}
+              disabled={toggling || isOcupado}
               className="data-[state=checked]:bg-green-500"
             />
+            <button
+              onClick={() => signOut()}
+              className="flex size-8 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              title="Cerrar sesion"
+            >
+              <LogOut className="size-4" />
+            </button>
           </div>
         </div>
       </header>

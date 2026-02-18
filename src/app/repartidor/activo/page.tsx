@@ -14,11 +14,14 @@ import {
   ChevronRight,
   Map,
   PackageCheck,
+  Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { mockOrders } from "@/lib/mock-data";
+import { useRepartidor } from "@/lib/hooks/use-repartidor";
+import { useActiveOrder } from "@/lib/hooks/use-active-order";
+import { advanceOrderStatus } from "@/lib/actions/order-actions";
 import {
   PAGO_REPARTIDOR,
   ORDER_STATUS_LABELS,
@@ -26,21 +29,19 @@ import {
 } from "@/lib/types";
 import { toast } from "sonner";
 
-type DeliveryStep = "en_camino" | "llegue" | "entregado";
-
 const STEP_CONFIG: Record<
-  DeliveryStep,
+  string,
   { label: string; action: string; icon: React.ElementType; color: string }
 > = {
+  asignado: {
+    label: "Dirígete al punto de recogida",
+    action: "En camino al cliente",
+    icon: Navigation,
+    color: "bg-blue-600 hover:bg-blue-700 shadow-blue-600/20",
+  },
   en_camino: {
     label: "En camino al cliente",
-    action: "Llegué al punto",
-    icon: Navigation,
-    color: "bg-purple-600 hover:bg-purple-700 shadow-purple-600/20",
-  },
-  llegue: {
-    label: "En el punto de entrega",
-    action: "Entrega completada",
+    action: "Llegué - Entrega completada",
     icon: Flag,
     color: "bg-green-600 hover:bg-green-700 shadow-green-600/20",
   },
@@ -65,45 +66,76 @@ function formatTime(seconds: number): string {
 }
 
 export default function EntregaActivaPage() {
-  const activeOrder = mockOrders.find((o) => o.status === "en_camino");
-  const [step, setStep] = useState<DeliveryStep>("en_camino");
+  const { repartidor, loading: repartidorLoading } = useRepartidor();
+  const { order: activeOrder, loading: orderLoading } = useActiveOrder(
+    repartidor?.id
+  );
   const [elapsed, setElapsed] = useState(0);
+  const [advancing, setAdvancing] = useState(false);
+
+  const loading = repartidorLoading || orderLoading;
+  const currentStatus = activeOrder?.status ?? "entregado";
 
   useEffect(() => {
-    if (step === "entregado") return;
+    if (!activeOrder || currentStatus === "entregado") return;
     const interval = setInterval(() => {
       setElapsed((prev) => prev + 1);
     }, 1000);
     return () => clearInterval(interval);
-  }, [step]);
+  }, [activeOrder, currentStatus]);
 
-  const handleNextStep = useCallback(() => {
-    if (step === "en_camino") {
-      setStep("llegue");
-      toast.info("Has llegado al punto de entrega", {
+  const handleNextStep = useCallback(async () => {
+    if (!activeOrder) return;
+    setAdvancing(true);
+
+    const result = await advanceOrderStatus(activeOrder.id);
+
+    if (result.error) {
+      toast.error("Error al avanzar", { description: result.error });
+    } else if (result.new_status === "en_camino") {
+      toast.info("En camino al cliente", {
         description: "Contacta al cliente si es necesario.",
       });
-    } else if (step === "llegue") {
-      setStep("entregado");
+    } else if (result.new_status === "entregado") {
       toast.success("Entrega completada", {
         description: `Has ganado ${formatCLP(
-          PAGO_REPARTIDOR * (activeOrder?.cantidad_bidones || 1)
+          PAGO_REPARTIDOR * activeOrder.cantidad_bidones
         )} por esta entrega.`,
       });
     }
-  }, [step, activeOrder]);
+    setAdvancing(false);
+  }, [activeOrder]);
 
   const handleNavigate = () => {
-    toast.info("Abriendo navegación...", {
-      description: "Se abriría Google Maps / Waze en producción.",
-    });
+    if (activeOrder?.lat && activeOrder?.lng) {
+      window.open(
+        `https://www.google.com/maps/dir/?api=1&destination=${activeOrder.lat},${activeOrder.lng}`,
+        "_blank"
+      );
+    } else {
+      toast.info("Abriendo navegación...", {
+        description: "Coordenadas no disponibles.",
+      });
+    }
   };
 
   const handleCall = () => {
-    toast.info("Llamando al cliente...", {
-      description: activeOrder?.cliente?.phone || "+56912345678",
-    });
+    const phone = activeOrder?.cliente?.phone;
+    if (phone) {
+      window.open(`tel:${phone}`, "_self");
+    } else {
+      toast.info("Teléfono no disponible");
+    }
   };
+
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20">
+        <Loader2 className="size-8 animate-spin text-primary" />
+        <p className="mt-3 text-sm text-muted-foreground">Cargando...</p>
+      </div>
+    );
+  }
 
   if (!activeOrder) {
     return (
@@ -125,11 +157,12 @@ export default function EntregaActivaPage() {
     );
   }
 
-  const currentStep = STEP_CONFIG[step];
-  const StepIcon = currentStep.icon;
+  const stepConfig = STEP_CONFIG[currentStatus] ?? STEP_CONFIG["entregado"];
+  const StepIcon = stepConfig.icon;
   const earnings = PAGO_REPARTIDOR * activeOrder.cantidad_bidones;
 
-  const stepIndex = step === "en_camino" ? 0 : step === "llegue" ? 1 : 2;
+  const stepIndex =
+    currentStatus === "asignado" ? 0 : currentStatus === "en_camino" ? 1 : 2;
 
   return (
     <div className="px-4 py-5 space-y-4">
@@ -142,7 +175,7 @@ export default function EntregaActivaPage() {
         <div className="flex items-center gap-2.5">
           <motion.div
             animate={
-              step !== "entregado"
+              currentStatus !== "entregado"
                 ? { scale: [1, 1.15, 1] }
                 : {}
             }
@@ -150,20 +183,24 @@ export default function EntregaActivaPage() {
           >
             <StepIcon
               className={`size-5 ${
-                step === "entregado" ? "text-green-600" : "text-purple-600"
+                currentStatus === "entregado"
+                  ? "text-green-600"
+                  : "text-purple-600"
               }`}
             />
           </motion.div>
           <span className="text-sm font-semibold text-foreground">
-            {currentStep.label}
+            {stepConfig.label}
           </span>
         </div>
         <Badge
-          className={ORDER_STATUS_COLORS[step === "entregado" ? "entregado" : "en_camino"]}
+          className={
+            ORDER_STATUS_COLORS[
+              currentStatus === "entregado" ? "entregado" : currentStatus
+            ]
+          }
         >
-          {step === "entregado"
-            ? ORDER_STATUS_LABELS.entregado
-            : ORDER_STATUS_LABELS.en_camino}
+          {ORDER_STATUS_LABELS[currentStatus as keyof typeof ORDER_STATUS_LABELS]}
         </Badge>
       </motion.div>
 
@@ -207,7 +244,6 @@ export default function EntregaActivaPage() {
       {/* Map Placeholder */}
       <Card className="overflow-hidden border-border/60 py-0 shadow-sm">
         <div className="relative h-40 bg-gradient-to-br from-blue-50 via-blue-100/50 to-primary/10">
-          {/* Simulated route */}
           <svg className="absolute inset-0 h-full w-full" viewBox="0 0 400 160">
             <motion.path
               d="M 40 120 Q 120 20, 200 80 T 360 40"
@@ -219,10 +255,8 @@ export default function EntregaActivaPage() {
               animate={{ pathLength: 1 }}
               transition={{ duration: 2, ease: "easeInOut" }}
             />
-            {/* Origin dot */}
             <circle cx="40" cy="120" r="6" fill="oklch(0.45 0.27 264)" />
             <circle cx="40" cy="120" r="3" fill="white" />
-            {/* Destination dot */}
             <motion.circle
               cx="360"
               cy="40"
@@ -233,7 +267,6 @@ export default function EntregaActivaPage() {
             />
             <circle cx="360" cy="40" r="3" fill="white" />
           </svg>
-          {/* Map label */}
           <div className="absolute bottom-2 left-2 flex items-center gap-1.5 rounded-full bg-white/80 px-2.5 py-1 backdrop-blur-sm">
             <Map className="size-3 text-muted-foreground" />
             <span className="text-[10px] font-medium text-muted-foreground">
@@ -271,7 +304,7 @@ export default function EntregaActivaPage() {
                   {activeOrder.cliente?.name || "Cliente"}
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  {activeOrder.cliente?.phone || "+56912345678"}
+                  {activeOrder.cliente?.phone || "Sin teléfono"}
                 </p>
               </div>
             </div>
@@ -319,21 +352,28 @@ export default function EntregaActivaPage() {
 
       {/* Action Button */}
       <AnimatePresence mode="wait">
-        {step !== "entregado" ? (
+        {currentStatus !== "entregado" ? (
           <motion.div
-            key={step}
+            key={currentStatus}
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
           >
             <Button
               size="lg"
-              className={`w-full h-14 text-base font-bold text-white shadow-lg ${currentStep.color} transition-all active:scale-[0.98]`}
+              className={`w-full h-14 text-base font-bold text-white shadow-lg ${stepConfig.color} transition-all active:scale-[0.98]`}
               onClick={handleNextStep}
+              disabled={advancing}
             >
-              <StepIcon className="size-5" />
-              {currentStep.action}
-              <ChevronRight className="size-5" />
+              {advancing ? (
+                <Loader2 className="size-5 animate-spin" />
+              ) : (
+                <>
+                  <StepIcon className="size-5" />
+                  {stepConfig.action}
+                  <ChevronRight className="size-5" />
+                </>
+              )}
             </Button>
           </motion.div>
         ) : (

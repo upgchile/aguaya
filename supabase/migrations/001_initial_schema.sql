@@ -188,14 +188,28 @@ insert into public.zones (name) values
 
 -- Auto-create profile on user signup
 create or replace function public.handle_new_user()
-returns trigger as $$
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  _role public.user_role;
 begin
-  insert into public.profiles (id, email, name, role)
+  -- Safe role casting
+  begin
+    _role := (new.raw_user_meta_data->>'role')::public.user_role;
+  exception when others then
+    _role := 'cliente';
+  end;
+
+  insert into public.profiles (id, email, phone, name, role)
   values (
     new.id,
     new.email,
+    coalesce(new.raw_user_meta_data->>'phone', ''),
     coalesce(new.raw_user_meta_data->>'name', split_part(new.email, '@', 1)),
-    coalesce((new.raw_user_meta_data->>'role')::user_role, 'cliente')
+    coalesce(_role, 'cliente')
   );
 
   -- If role is repartidor, create repartidor profile
@@ -205,7 +219,7 @@ begin
 
   return new;
 end;
-$$ language plpgsql security definer;
+$$;
 
 create trigger on_auth_user_created
   after insert on auth.users
@@ -213,7 +227,11 @@ create trigger on_auth_user_created
 
 -- Auto-create payment when order is delivered
 create or replace function public.handle_order_delivered()
-returns trigger as $$
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
 begin
   if new.status = 'entregado' and old.status != 'entregado' and new.repartidor_id is not null then
     insert into public.payments (repartidor_id, order_id, monto_bruto, comision, monto_neto)
@@ -233,7 +251,7 @@ begin
 
   return new;
 end;
-$$ language plpgsql security definer;
+$$;
 
 create trigger on_order_delivered
   after update on public.orders

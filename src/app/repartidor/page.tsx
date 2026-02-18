@@ -5,25 +5,20 @@ import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   MapPin,
-  Navigation,
   Droplets,
   ChevronRight,
   Inbox,
   Bell,
+  Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { mockOrders } from "@/lib/mock-data";
-import { PAGO_REPARTIDOR, Order } from "@/lib/types";
+import { usePendingOrders } from "@/lib/hooks/use-pending-orders";
+import { useRepartidor } from "@/lib/hooks/use-repartidor";
+import { acceptOrder } from "@/lib/actions/order-actions";
+import { PAGO_REPARTIDOR } from "@/lib/types";
 import { toast } from "sonner";
-
-const mockDistances: Record<string, string> = {
-  "ord-001": "0.8 km",
-  "ord-002": "1.2 km",
-  "ord-003": "2.1 km",
-  "ord-004": "0.5 km",
-};
 
 function formatCLP(amount: number): string {
   return `$${amount.toLocaleString("es-CL")}`;
@@ -31,25 +26,58 @@ function formatCLP(amount: number): string {
 
 export default function PedidosCercanosPage() {
   const router = useRouter();
-  const [pendingOrders, setPendingOrders] = useState<Order[]>(
-    mockOrders.filter((o) => o.status === "pendiente")
-  );
+  const { orders, loading } = usePendingOrders();
+  const { repartidor } = useRepartidor();
   const [acceptingId, setAcceptingId] = useState<string | null>(null);
 
-  const handleAccept = (orderId: string) => {
+  const isDisponible = repartidor?.status === "disponible";
+
+  const handleAccept = async (orderId: string) => {
     setAcceptingId(orderId);
 
-    setTimeout(() => {
-      setPendingOrders((prev) => prev.filter((o) => o.id !== orderId));
+    const result = await acceptOrder(orderId);
+
+    if (result.error) {
+      toast.error("No se pudo aceptar", { description: result.error });
       setAcceptingId(null);
-      toast.success("Pedido aceptado", {
-        description: "Dirígete al punto de recogida.",
-      });
-      setTimeout(() => {
-        router.push("/repartidor/activo");
-      }, 800);
-    }, 600);
+      return;
+    }
+
+    toast.success("Pedido aceptado", {
+      description: "Dirígete al punto de recogida.",
+    });
+    setAcceptingId(null);
+    router.push("/repartidor/activo");
   };
+
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20">
+        <Loader2 className="size-8 animate-spin text-primary" />
+        <p className="mt-3 text-sm text-muted-foreground">Cargando pedidos...</p>
+      </div>
+    );
+  }
+
+  if (!isDisponible) {
+    return (
+      <div className="flex flex-col items-center justify-center px-4 py-20 text-center">
+        <div className="mb-5 flex size-20 items-center justify-center rounded-full bg-muted">
+          <Inbox className="size-9 text-muted-foreground" />
+        </div>
+        <h3 className="mb-2 text-lg font-semibold text-foreground">
+          {repartidor?.status === "ocupado"
+            ? "Tienes una entrega activa"
+            : "Estás desconectado"}
+        </h3>
+        <p className="max-w-[260px] text-sm text-muted-foreground leading-relaxed">
+          {repartidor?.status === "ocupado"
+            ? "Completa tu entrega actual antes de aceptar nuevos pedidos."
+            : "Activa el switch de disponibilidad para ver pedidos cercanos."}
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="px-4 py-5">
@@ -59,13 +87,13 @@ export default function PedidosCercanosPage() {
           <h1 className="text-xl font-bold text-foreground">
             Pedidos Cercanos
           </h1>
-          {pendingOrders.length > 0 && (
+          {orders.length > 0 && (
             <Badge className="bg-primary text-primary-foreground text-xs tabular-nums">
-              {pendingOrders.length}
+              {orders.length}
             </Badge>
           )}
         </div>
-        {pendingOrders.length > 0 && (
+        {orders.length > 0 && (
           <motion.div
             animate={{ scale: [1, 1.2, 1] }}
             transition={{ repeat: Infinity, duration: 2, ease: "easeInOut" }}
@@ -81,9 +109,9 @@ export default function PedidosCercanosPage() {
 
       {/* Order Cards */}
       <AnimatePresence mode="popLayout">
-        {pendingOrders.length > 0 ? (
+        {orders.length > 0 ? (
           <div className="flex flex-col gap-3">
-            {pendingOrders.map((order, index) => (
+            {orders.map((order, index) => (
               <motion.div
                 key={order.id}
                 layout
@@ -113,17 +141,9 @@ export default function PedidosCercanosPage() {
                         {/* Address */}
                         <div className="flex items-start gap-2">
                           <MapPin className="mt-0.5 size-4 shrink-0 text-primary" />
-                          <div>
-                            <p className="text-sm font-medium leading-tight text-foreground">
-                              {order.address}
-                            </p>
-                            <div className="mt-1 flex items-center gap-1.5">
-                              <Navigation className="size-3 text-muted-foreground" />
-                              <span className="text-xs text-muted-foreground">
-                                {mockDistances[order.id] || "1.0 km"}
-                              </span>
-                            </div>
-                          </div>
+                          <p className="text-sm font-medium leading-tight text-foreground">
+                            {order.address}
+                          </p>
                         </div>
 
                         {/* Details row */}
@@ -153,7 +173,7 @@ export default function PedidosCercanosPage() {
                           size="lg"
                           className="bg-green-600 hover:bg-green-700 text-white font-semibold shadow-md shadow-green-600/20 transition-all active:scale-95"
                           onClick={() => handleAccept(order.id)}
-                          disabled={acceptingId === order.id}
+                          disabled={acceptingId !== null}
                         >
                           {acceptingId === order.id ? (
                             <motion.div

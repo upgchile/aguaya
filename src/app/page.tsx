@@ -212,28 +212,12 @@ export default function Home() {
 
         {/* Content */}
         <div className="relative z-10 mx-auto max-w-6xl px-4 py-20 text-center sm:px-6 lg:px-8">
-          {/* Animated water drop */}
-          <motion.div
-            initial={{ opacity: 0, scale: 0.5 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.7, ease: "easeOut" }}
-            className="mx-auto mb-8"
-          >
-            <motion.div
-              animate={{ y: [0, -8, 0] }}
-              transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
-              className="inline-flex items-center justify-center rounded-full bg-primary/10 p-4"
-            >
-              <Droplet className="size-10 fill-primary/30 text-primary sm:size-12" />
-            </motion.div>
-          </motion.div>
-
           <motion.h1
             variants={fadeUp}
             initial="hidden"
             animate="visible"
             custom={0}
-            className="mx-auto max-w-3xl text-4xl font-extrabold tracking-tight text-foreground sm:text-5xl md:text-6xl lg:text-7xl"
+            className="mx-auto max-w-3xl text-4xl font-extrabold tracking-tight text-foreground sm:text-5xl md:text-6xl"
           >
             Agua pura,{" "}
             <span className="bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">
@@ -246,35 +230,66 @@ export default function Home() {
             initial="hidden"
             animate="visible"
             custom={1}
-            className="mx-auto mt-6 max-w-xl text-base text-muted-foreground sm:text-lg md:text-xl"
+            className="mx-auto mt-4 max-w-md text-base text-muted-foreground sm:text-lg"
           >
-            Bidones de 20L de agua purificada a tu puerta en menos de 30
-            minutos. Pide con un click.
+            Bidones de 20L de agua purificada a tu puerta
           </motion.p>
 
-          {/* CTAs */}
+          {/* Big circular CTA button - Lovable style */}
           <motion.div
+            initial={{ opacity: 0, scale: 0.5 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.6, delay: 0.3, ease: "easeOut" as const }}
+            className="mt-10 flex justify-center"
+          >
+            <Link href="/cliente" className="group relative">
+              {/* Outer pulse ring */}
+              <motion.div
+                animate={{ scale: [1, 1.15, 1], opacity: [0.3, 0, 0.3] }}
+                transition={{ duration: 2.5, repeat: Infinity, ease: "easeInOut" }}
+                className="absolute inset-0 rounded-full bg-primary"
+              />
+              {/* Button */}
+              <motion.div
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                className="relative flex size-40 flex-col items-center justify-center rounded-full bg-gradient-to-br from-primary to-primary/85 shadow-2xl shadow-primary/30 transition-shadow hover:shadow-primary/40 sm:size-48"
+              >
+                <Droplets className="mb-2 size-8 text-white/90 sm:size-9" />
+                <span className="text-lg font-bold text-white sm:text-xl">
+                  Pedir Ahora
+                </span>
+              </motion.div>
+            </Link>
+          </motion.div>
+
+          {/* Delivery promise */}
+          <motion.p
             variants={fadeUp}
             initial="hidden"
             animate="visible"
             custom={2}
-            className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row"
+            className="mt-8 text-sm text-muted-foreground"
           >
-            <Button
-              asChild
-              size="lg"
-              className="animate-pulse-ring h-12 rounded-full px-8 text-base font-semibold shadow-lg shadow-primary/25"
+            Entrega inmediata en menos de{" "}
+            <span className="font-semibold text-primary">30 minutos</span>
+          </motion.p>
+
+          {/* Agendar entrega */}
+          <motion.div
+            variants={fadeUp}
+            initial="hidden"
+            animate="visible"
+            custom={3}
+            className="mt-4"
+          >
+            <Link
+              href="/cliente"
+              className="inline-flex items-center gap-2 rounded-full border border-border bg-white/60 px-5 py-2.5 text-sm font-medium text-foreground/70 backdrop-blur-sm transition-all hover:border-primary/30 hover:text-primary"
             >
-              <Link href="/cliente">Pedir Ahora</Link>
-            </Button>
-            <Button
-              asChild
-              variant="outline"
-              size="lg"
-              className="h-12 rounded-full px-8 text-base font-semibold"
-            >
-              <Link href="/repartidor">Soy Repartidor</Link>
-            </Button>
+              <CalendarClock className="size-4" />
+              Agendar entrega
+            </Link>
           </motion.div>
 
           {/* Stats row */}
@@ -282,21 +297,17 @@ export default function Home() {
             variants={fadeUp}
             initial="hidden"
             animate="visible"
-            custom={3}
-            className="mx-auto mt-16 flex max-w-md flex-wrap items-center justify-center gap-6 sm:gap-10"
+            custom={4}
+            className="mx-auto mt-12 grid max-w-md grid-cols-3 gap-4"
           >
-            {stats.map((stat, i) => (
-              <div key={stat.label} className="flex items-center gap-3">
-                {i > 0 && (
-                  <div className="mr-3 hidden h-8 w-px bg-border sm:mr-4 sm:block" />
-                )}
-                <div className="flex size-10 items-center justify-center rounded-xl bg-primary/10">
-                  <stat.icon className="size-5 text-primary" />
-                </div>
-                <div className="text-left">
-                  <p className="text-sm font-bold text-foreground">{stat.label}</p>
-                  <p className="text-xs text-muted-foreground">{stat.sublabel}</p>
-                </div>
+            {stats.map((stat) => (
+              <div
+                key={stat.label}
+                className="flex flex-col items-center gap-2 rounded-2xl border border-border/60 bg-white/70 px-4 py-5 shadow-sm backdrop-blur-sm"
+              >
+                <stat.icon className="size-6 text-primary" />
+                <p className="text-sm font-bold text-foreground">{stat.label}</p>
+                <p className="text-xs text-muted-foreground">{stat.sublabel}</p>
               </div>
             ))}
           </motion.div>
@@ -582,7 +593,15 @@ export default function Home() {
 
           <div className="mt-8 border-t border-border pt-6 text-center">
             <p className="text-xs text-muted-foreground">
-              &copy; 2026 Aguaya. Todos los derechos reservados.
+              &copy; 2026 Aguaya. Desarrollado por{" "}
+              <a
+                href="https://upg.cl"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-medium text-primary hover:underline"
+              >
+                UPG
+              </a>
             </p>
           </div>
         </div>

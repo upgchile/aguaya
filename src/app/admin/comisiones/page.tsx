@@ -1,10 +1,9 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -16,28 +15,94 @@ import {
   Truck,
   Building2,
   Droplets,
+  Loader2,
 } from "lucide-react";
+import { createClient } from "@/lib/supabase/client";
+import { updatePlatformConfig } from "@/lib/actions/admin-actions";
 
 export default function ComisionesPage() {
   const [precioBidon, setPrecioBidon] = useState(4500);
   const [comisionPlataforma, setComisionPlataforma] = useState(500);
   const [descuento3, setDescuento3] = useState(5);
   const [descuento5, setDescuento5] = useState(10);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    const supabase = createClient();
+
+    async function fetchConfig() {
+      const { data } = await supabase
+        .from("platform_config")
+        .select("key, value");
+
+      if (data) {
+        for (const row of data) {
+          const val = Number(row.value);
+          switch (row.key) {
+            case "precio_bidon":
+              setPrecioBidon(val);
+              break;
+            case "comision_plataforma":
+              setComisionPlataforma(val);
+              break;
+            case "descuento_3_bidones":
+              setDescuento3(val);
+              break;
+            case "descuento_5_bidones":
+              setDescuento5(val);
+              break;
+          }
+        }
+      }
+      setLoading(false);
+    }
+
+    fetchConfig();
+  }, []);
 
   const pagoRepartidor = useMemo(
     () => precioBidon - comisionPlataforma - 1000,
     [precioBidon, comisionPlataforma]
   );
 
-  const handleSave = () => {
-    toast.success("Configuracion guardada exitosamente", {
-      description: "Los nuevos valores de comisiones se aplicaran a los proximos pedidos.",
-    });
+  const handleSave = async () => {
+    setSaving(true);
+
+    const updates = [
+      updatePlatformConfig("precio_bidon", String(precioBidon)),
+      updatePlatformConfig("comision_plataforma", String(comisionPlataforma)),
+      updatePlatformConfig("pago_repartidor", String(pagoRepartidor)),
+      updatePlatformConfig("descuento_3_bidones", String(descuento3)),
+      updatePlatformConfig("descuento_5_bidones", String(descuento5)),
+    ];
+
+    const results = await Promise.all(updates);
+    const hasError = results.some((r) => r.error);
+
+    if (hasError) {
+      toast.error("Error al guardar algunos valores");
+    } else {
+      toast.success("Configuracion guardada exitosamente", {
+        description:
+          "Los nuevos valores de comisiones se aplicaran a los proximos pedidos.",
+      });
+    }
+    setSaving(false);
   };
 
   const formatCLP = (amount: number) => {
     return `$${amount.toLocaleString("es-CL")}`;
   };
+
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20">
+        <Loader2 className="size-8 animate-spin text-primary" />
+        <p className="mt-3 text-sm text-gray-500">Cargando configuración...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -175,8 +240,13 @@ export default function ComisionesPage() {
               <Button
                 className="w-full bg-primary hover:bg-primary/90"
                 onClick={handleSave}
+                disabled={saving}
               >
-                <Save className="mr-2 h-4 w-4" />
+                {saving ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Save className="mr-2 h-4 w-4" />
+                )}
                 Guardar Cambios
               </Button>
             </CardContent>

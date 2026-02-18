@@ -1,13 +1,12 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
   Table,
   TableBody,
@@ -17,23 +16,15 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Search, Plus, Pencil, Trash2, UserPlus } from "lucide-react";
-import { mockUsers } from "@/lib/mock-data";
-import type { UserRole } from "@/lib/types";
+import { Search, Loader2 } from "lucide-react";
+import { createClient } from "@/lib/supabase/client";
+import type { User, UserRole } from "@/lib/types";
 
 const ROLE_LABELS: Record<UserRole, string> = {
   cliente: "Cliente",
@@ -48,30 +39,45 @@ const ROLE_COLORS: Record<UserRole, string> = {
 };
 
 export default function UsuariosPage() {
+  const [users, setUsers] = useState<User[]>([]);
+  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState<string>("todos");
-  const [dialogOpen, setDialogOpen] = useState(false);
 
-  // Form state
-  const [formName, setFormName] = useState("");
-  const [formEmail, setFormEmail] = useState("");
-  const [formPhone, setFormPhone] = useState("");
-  const [formRole, setFormRole] = useState<UserRole>("cliente");
+  useEffect(() => {
+    const supabase = createClient();
+
+    async function fetchUsers() {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("*")
+        .order("created_at", { ascending: false });
+
+      if (error) {
+        toast.error("Error cargando usuarios", { description: error.message });
+      } else {
+        setUsers((data as User[]) ?? []);
+      }
+      setLoading(false);
+    }
+
+    fetchUsers();
+  }, []);
 
   const filteredUsers = useMemo(() => {
-    return mockUsers.filter((user) => {
+    return users.filter((user) => {
       const matchesSearch =
         search === "" ||
         user.name.toLowerCase().includes(search.toLowerCase()) ||
         user.email.toLowerCase().includes(search.toLowerCase()) ||
-        user.phone.includes(search);
+        (user.phone && user.phone.includes(search));
 
       const matchesRole =
         roleFilter === "todos" || user.role === roleFilter;
 
       return matchesSearch && matchesRole;
     });
-  }, [search, roleFilter]);
+  }, [users, search, roleFilter]);
 
   const formatDate = (dateStr: string) => {
     return new Date(dateStr).toLocaleDateString("es-CL", {
@@ -81,119 +87,25 @@ export default function UsuariosPage() {
     });
   };
 
-  const handleEdit = (userName: string) => {
-    toast.info(`Editar usuario: ${userName}`, {
-      description: "Funcionalidad disponible en la siguiente versión.",
-    });
-  };
-
-  const handleDelete = (userName: string) => {
-    toast.warning(`Eliminar usuario: ${userName}`, {
-      description: "Funcionalidad disponible en la siguiente versión.",
-    });
-  };
-
-  const handleCreateUser = () => {
-    if (!formName || !formEmail) {
-      toast.error("Nombre y email son obligatorios.");
-      return;
-    }
-    toast.success("Usuario creado exitosamente", {
-      description: `${formName} (${ROLE_LABELS[formRole]}) agregado al sistema.`,
-    });
-    setFormName("");
-    setFormEmail("");
-    setFormPhone("");
-    setFormRole("cliente");
-    setDialogOpen(false);
-  };
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20">
+        <Loader2 className="size-8 animate-spin text-primary" />
+        <p className="mt-3 text-sm text-gray-500">Cargando usuarios...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
       {/* Title */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">
-            Gesti&oacute;n de Usuarios
-          </h1>
-          <p className="mt-1 text-sm text-gray-500">
-            {mockUsers.length} usuarios registrados en la plataforma
-          </p>
-        </div>
-        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogTrigger asChild>
-            <Button className="bg-primary hover:bg-primary/90">
-              <UserPlus className="mr-2 h-4 w-4" />
-              Agregar Usuario
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-md">
-            <DialogHeader>
-              <DialogTitle>Nuevo Usuario</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4 py-4">
-              <div className="space-y-2">
-                <Label htmlFor="name">Nombre completo</Label>
-                <Input
-                  id="name"
-                  placeholder="Ej: Juan Perez"
-                  value={formName}
-                  onChange={(e) => setFormName(e.target.value)}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="juan@example.com"
-                  value={formEmail}
-                  onChange={(e) => setFormEmail(e.target.value)}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="phone">Tel&eacute;fono</Label>
-                <Input
-                  id="phone"
-                  type="tel"
-                  placeholder="+56 9 1234 5678"
-                  value={formPhone}
-                  onChange={(e) => setFormPhone(e.target.value)}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="role">Rol</Label>
-                <Select
-                  value={formRole}
-                  onValueChange={(v) => setFormRole(v as UserRole)}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Seleccionar rol" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="cliente">Cliente</SelectItem>
-                    <SelectItem value="repartidor">Repartidor</SelectItem>
-                    <SelectItem value="admin">Admin</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            <DialogFooter>
-              <Button
-                variant="outline"
-                onClick={() => setDialogOpen(false)}
-              >
-                Cancelar
-              </Button>
-              <Button
-                className="bg-primary hover:bg-primary/90"
-                onClick={handleCreateUser}
-              >
-                Crear Usuario
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+      <div>
+        <h1 className="text-2xl font-bold text-gray-900">
+          Gesti&oacute;n de Usuarios
+        </h1>
+        <p className="mt-1 text-sm text-gray-500">
+          {users.length} usuarios registrados en la plataforma
+        </p>
       </div>
 
       {/* Filters */}
@@ -208,7 +120,7 @@ export default function UsuariosPage() {
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
                 <Input
-                  placeholder="Buscar por nombre, email o tel&eacute;fono..."
+                  placeholder="Buscar por nombre, email o teléfono..."
                   className="pl-10"
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
@@ -247,7 +159,6 @@ export default function UsuariosPage() {
                     <TableHead>Tel&eacute;fono</TableHead>
                     <TableHead className="text-center">Rol</TableHead>
                     <TableHead>Fecha Registro</TableHead>
-                    <TableHead className="text-right">Acciones</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -260,7 +171,7 @@ export default function UsuariosPage() {
                         {user.email}
                       </TableCell>
                       <TableCell className="text-gray-600">
-                        {user.phone}
+                        {user.phone || "---"}
                       </TableCell>
                       <TableCell className="text-center">
                         <Badge
@@ -273,32 +184,12 @@ export default function UsuariosPage() {
                       <TableCell className="text-sm text-gray-500">
                         {formatDate(user.created_at)}
                       </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex items-center justify-end gap-1">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 text-gray-500 hover:text-primary"
-                            onClick={() => handleEdit(user.name)}
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 text-gray-500 hover:text-red-600"
-                            onClick={() => handleDelete(user.name)}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
                     </TableRow>
                   ))}
                   {filteredUsers.length === 0 && (
                     <TableRow>
                       <TableCell
-                        colSpan={6}
+                        colSpan={5}
                         className="py-8 text-center text-gray-400"
                       >
                         No se encontraron usuarios con los filtros aplicados

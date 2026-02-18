@@ -11,6 +11,8 @@ import {
   Package,
   Truck,
   Navigation,
+  Loader2,
+  InboxIcon,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -21,7 +23,7 @@ import {
   ORDER_STATUS_COLORS,
 } from "@/lib/types";
 import type { OrderStatus } from "@/lib/types";
-import { mockOrders, mockRepartidorProfile } from "@/lib/mock-data";
+import { useClientOrders } from "@/lib/hooks/use-client-orders";
 
 const STEPPER_STATUSES = [
   "pendiente",
@@ -44,19 +46,37 @@ function formatCLP(amount: number): string {
 }
 
 export default function TrackingPage() {
-  // Get active (in-progress) order from mock data
-  const activeOrder =
-    mockOrders.find(
-      (o) =>
-        o.status === "en_camino" ||
-        o.status === "asignado" ||
-        o.status === "pendiente"
-    ) ?? mockOrders[0];
+  const { activeOrder, loading } = useClientOrders();
+
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20">
+        <Loader2 className="size-8 animate-spin text-primary" />
+        <p className="mt-3 text-sm text-muted-foreground">Cargando pedido...</p>
+      </div>
+    );
+  }
+
+  if (!activeOrder) {
+    return (
+      <div className="flex flex-col items-center justify-center px-4 py-20 text-center">
+        <div className="mb-4 flex size-16 items-center justify-center rounded-full bg-muted">
+          <InboxIcon className="size-8 text-muted-foreground" />
+        </div>
+        <h3 className="mb-2 text-lg font-semibold text-foreground">
+          Sin pedido activo
+        </h3>
+        <p className="text-sm text-muted-foreground">
+          Crea un pedido para ver el tracking en tiempo real.
+        </p>
+      </div>
+    );
+  }
 
   const currentStepIdx = STEPPER_STATUSES.indexOf(
     activeOrder.status as StepperStatus
   );
-  const repartidor = mockRepartidorProfile;
+  const repartidor = activeOrder.repartidor;
 
   return (
     <div className="px-4 pt-4">
@@ -69,7 +89,7 @@ export default function TrackingPage() {
       >
         <h1 className="text-xl font-bold text-foreground">Tu Pedido</h1>
         <p className="text-sm text-muted-foreground">
-          Pedido #{activeOrder.id}
+          Pedido #{activeOrder.id.slice(0, 8)}...
         </p>
       </motion.div>
 
@@ -161,51 +181,66 @@ export default function TrackingPage() {
             </div>
             <div>
               <p className="text-sm font-medium text-foreground">
-                Llegada estimada
+                {activeOrder.status === "pendiente"
+                  ? "Buscando repartidor..."
+                  : "Llegada estimada"}
               </p>
-              <p className="text-xl font-bold text-primary">12 minutos</p>
+              <p className="text-xl font-bold text-primary">
+                {activeOrder.status === "pendiente"
+                  ? "Esperando"
+                  : activeOrder.status === "entregado"
+                  ? "Entregado"
+                  : "~15 minutos"}
+              </p>
             </div>
           </CardContent>
         </Card>
       </motion.div>
 
       {/* Repartidor Card */}
-      <motion.div
-        initial={{ opacity: 0, y: 16 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4, delay: 0.2 }}
-        className="mt-4"
-      >
-        <Card className="border-0 shadow-md">
-          <CardContent className="py-2">
-            <div className="flex items-center gap-3">
-              <div className="flex size-12 items-center justify-center rounded-full bg-muted">
-                <User className="size-6 text-muted-foreground" />
-              </div>
-              <div className="flex-1">
-                <p className="font-semibold text-foreground">
-                  {repartidor.user?.name ?? "Carlos M."}
-                </p>
-                <div className="flex items-center gap-1">
-                  <Star className="size-3.5 fill-amber-400 text-amber-400" />
-                  <span className="text-sm font-medium text-foreground">
-                    {repartidor.rating}
-                  </span>
-                  <span className="text-xs text-muted-foreground">
-                    ({repartidor.total_entregas} entregas)
-                  </span>
+      {repartidor && (
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, delay: 0.2 }}
+          className="mt-4"
+        >
+          <Card className="border-0 shadow-md">
+            <CardContent className="py-2">
+              <div className="flex items-center gap-3">
+                <div className="flex size-12 items-center justify-center rounded-full bg-muted">
+                  <User className="size-6 text-muted-foreground" />
                 </div>
+                <div className="flex-1">
+                  <p className="font-semibold text-foreground">
+                    {repartidor.user?.name ?? "Repartidor"}
+                  </p>
+                  <div className="flex items-center gap-1">
+                    <Star className="size-3.5 fill-amber-400 text-amber-400" />
+                    <span className="text-sm font-medium text-foreground">
+                      {repartidor.rating}
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      ({repartidor.total_entregas} entregas)
+                    </span>
+                  </div>
+                </div>
+                {repartidor.user?.phone && (
+                  <Button
+                    size="icon"
+                    className="size-10 rounded-full bg-green-500 hover:bg-green-600"
+                    onClick={() =>
+                      window.open(`tel:${repartidor.user!.phone}`, "_self")
+                    }
+                  >
+                    <Phone className="size-4 text-white" />
+                  </Button>
+                )}
               </div>
-              <Button
-                size="icon"
-                className="size-10 rounded-full bg-green-500 hover:bg-green-600"
-              >
-                <Phone className="size-4 text-white" />
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      </motion.div>
+            </CardContent>
+          </Card>
+        </motion.div>
+      )}
 
       {/* Map Placeholder */}
       <motion.div

@@ -12,10 +12,12 @@ import {
   Target,
   Award,
   ChevronRight,
+  Loader2,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { mockOrders, mockRepartidorProfile } from "@/lib/mock-data";
+import { useRepartidor } from "@/lib/hooks/use-repartidor";
+import { useEarnings } from "@/lib/hooks/use-earnings";
 import { PAGO_REPARTIDOR } from "@/lib/types";
 
 function formatCLP(amount: number): string {
@@ -30,43 +32,62 @@ function formatTime(dateStr: string): string {
   });
 }
 
-const summaryCards = [
-  {
-    label: "Hoy",
-    amount: 9000,
-    deliveries: 3,
-    icon: DollarSign,
-    color: "text-green-600",
-    bgColor: "bg-green-50",
-  },
-  {
-    label: "Esta semana",
-    amount: 45000,
-    deliveries: 15,
-    icon: Calendar,
-    color: "text-primary",
-    bgColor: "bg-blue-50",
-  },
-  {
-    label: "Este mes",
-    amount: 180000,
-    deliveries: 60,
-    icon: CalendarDays,
-    color: "text-purple-600",
-    bgColor: "bg-purple-50",
-  },
-];
-
 const DAILY_GOAL = 30000;
-const todayEarnings = 9000;
-const goalProgress = Math.min((todayEarnings / DAILY_GOAL) * 100, 100);
 
 export default function GananciasPage() {
-  const deliveredOrders = mockOrders
-    .filter((o) => o.status === "entregado")
-    .slice(0, 5);
+  const { repartidor, loading: repartidorLoading } = useRepartidor();
+  const {
+    today,
+    week,
+    month,
+    todayDeliveries,
+    weekDeliveries,
+    monthDeliveries,
+    recentOrders,
+    loading: earningsLoading,
+  } = useEarnings(repartidor?.id);
 
-  const { rating, total_entregas } = mockRepartidorProfile;
+  const loading = repartidorLoading || earningsLoading;
+
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20">
+        <Loader2 className="size-8 animate-spin text-primary" />
+        <p className="mt-3 text-sm text-muted-foreground">Cargando ganancias...</p>
+      </div>
+    );
+  }
+
+  const rating = repartidor?.rating ?? 5.0;
+  const total_entregas = repartidor?.total_entregas ?? 0;
+  const goalProgress = Math.min((today / DAILY_GOAL) * 100, 100);
+
+  const summaryCards = [
+    {
+      label: "Hoy",
+      amount: today,
+      deliveries: todayDeliveries,
+      icon: DollarSign,
+      color: "text-green-600",
+      bgColor: "bg-green-50",
+    },
+    {
+      label: "Esta semana",
+      amount: week,
+      deliveries: weekDeliveries,
+      icon: Calendar,
+      color: "text-primary",
+      bgColor: "bg-blue-50",
+    },
+    {
+      label: "Este mes",
+      amount: month,
+      deliveries: monthDeliveries,
+      icon: CalendarDays,
+      color: "text-purple-600",
+      bgColor: "bg-purple-50",
+    },
+  ];
 
   return (
     <div className="px-4 py-5 space-y-5">
@@ -75,7 +96,7 @@ export default function GananciasPage() {
         <h1 className="text-xl font-bold text-foreground">Ganancias</h1>
         <Badge variant="secondary" className="gap-1 text-xs font-semibold">
           <Award className="size-3" />
-          Nivel Oro
+          {total_entregas >= 100 ? "Nivel Oro" : total_entregas >= 50 ? "Nivel Plata" : "Nivel Bronce"}
         </Badge>
       </div>
 
@@ -145,23 +166,25 @@ export default function GananciasPage() {
 
             <div className="mt-2 flex items-center justify-between">
               <span className="text-xs text-muted-foreground">
-                {formatCLP(todayEarnings)} ganados
+                {formatCLP(today)} ganados
               </span>
               <span className="text-xs font-medium text-primary">
                 {Math.round(goalProgress)}%
               </span>
             </div>
 
-            <div className="mt-3 flex items-center gap-2 rounded-lg bg-blue-50 p-2.5">
-              <TrendingUp className="size-4 text-primary shrink-0" />
-              <p className="text-xs text-primary/80">
-                Te faltan{" "}
-                <span className="font-bold text-primary">
-                  {formatCLP(DAILY_GOAL - todayEarnings)}
-                </span>{" "}
-                para alcanzar tu meta. ({Math.ceil((DAILY_GOAL - todayEarnings) / PAGO_REPARTIDOR)} entregas más)
-              </p>
-            </div>
+            {today < DAILY_GOAL && (
+              <div className="mt-3 flex items-center gap-2 rounded-lg bg-blue-50 p-2.5">
+                <TrendingUp className="size-4 text-primary shrink-0" />
+                <p className="text-xs text-primary/80">
+                  Te faltan{" "}
+                  <span className="font-bold text-primary">
+                    {formatCLP(DAILY_GOAL - today)}
+                  </span>{" "}
+                  para alcanzar tu meta. ({Math.ceil((DAILY_GOAL - today) / PAGO_REPARTIDOR)} entregas más)
+                </p>
+              </div>
+            )}
           </CardContent>
         </Card>
       </motion.div>
@@ -181,7 +204,7 @@ export default function GananciasPage() {
                   <Star className="size-5 text-yellow-500 fill-yellow-500" />
                 </div>
                 <div>
-                  <p className="text-xl font-bold text-foreground">{rating}</p>
+                  <p className="text-xl font-bold text-foreground">{Number(rating).toFixed(1)}</p>
                   <p className="text-[10px] text-muted-foreground">Calificación</p>
                 </div>
               </div>
@@ -208,9 +231,9 @@ export default function GananciasPage() {
                 <Star
                   key={star}
                   className={`size-4 ${
-                    star <= Math.floor(rating)
+                    star <= Math.floor(Number(rating))
                       ? "text-yellow-400 fill-yellow-400"
-                      : star <= rating
+                      : star <= Number(rating)
                       ? "text-yellow-400 fill-yellow-400/50"
                       : "text-gray-200 fill-gray-200"
                   }`}
@@ -236,16 +259,12 @@ export default function GananciasPage() {
               <CardTitle className="text-sm font-semibold text-foreground">
                 Entregas recientes
               </CardTitle>
-              <button className="flex items-center gap-0.5 text-xs font-medium text-primary">
-                Ver todo
-                <ChevronRight className="size-3.5" />
-              </button>
             </div>
           </CardHeader>
           <CardContent className="p-4 pt-3">
             <div className="space-y-3">
-              {deliveredOrders.length > 0 ? (
-                deliveredOrders.map((order, index) => {
+              {recentOrders.length > 0 ? (
+                recentOrders.map((order, index) => {
                   const earnings = PAGO_REPARTIDOR * order.cantidad_bidones;
                   return (
                     <motion.div

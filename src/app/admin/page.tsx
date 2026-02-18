@@ -1,6 +1,5 @@
 "use client";
 
-import { useMemo } from "react";
 import { motion } from "framer-motion";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -12,8 +11,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Package, DollarSign, Users, TrendingUp } from "lucide-react";
-import { mockOrders } from "@/lib/mock-data";
+import { Package, DollarSign, Users, TrendingUp, Loader2 } from "lucide-react";
+import { useAdminStats } from "@/lib/hooks/use-admin-stats";
 import {
   ORDER_STATUS_LABELS,
   ORDER_STATUS_COLORS,
@@ -34,33 +33,28 @@ const item = {
 };
 
 export default function AdminDashboard() {
-  const today = new Date().toISOString().split("T")[0];
+  const {
+    todayOrders,
+    todayRevenue,
+    activeRepartidores,
+    deliveryRate,
+    recentOrders,
+    loading,
+  } = useAdminStats();
 
-  const todayOrders = useMemo(
-    () => mockOrders.filter((o) => o.created_at.startsWith(today)),
-    [today]
-  );
-
-  const todayRevenue = useMemo(
-    () => todayOrders.reduce((sum, o) => sum + o.comision_plataforma, 0),
-    [todayOrders]
-  );
-
-  const recentOrders = useMemo(
-    () =>
-      [...mockOrders]
-        .sort(
-          (a, b) =>
-            new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-        )
-        .slice(0, 5),
-    []
-  );
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20">
+        <Loader2 className="size-8 animate-spin text-primary" />
+        <p className="mt-3 text-sm text-gray-500">Cargando dashboard...</p>
+      </div>
+    );
+  }
 
   const stats = [
     {
       title: "Pedidos Hoy",
-      value: todayOrders.length,
+      value: todayOrders,
       icon: Package,
       color: "text-blue-600",
       bg: "bg-blue-50",
@@ -74,14 +68,14 @@ export default function AdminDashboard() {
     },
     {
       title: "Repartidores Activos",
-      value: 3,
+      value: activeRepartidores,
       icon: Users,
       color: "text-purple-600",
       bg: "bg-purple-50",
     },
     {
       title: "Tasa de Entrega",
-      value: "95%",
+      value: `${deliveryRate}%`,
       icon: TrendingUp,
       color: "text-orange-600",
       bg: "bg-orange-50",
@@ -173,9 +167,7 @@ export default function AdminDashboard() {
                   {recentOrders.map((order) => (
                     <TableRow key={order.id}>
                       <TableCell className="font-mono text-xs text-gray-500">
-                        {order.id.length > 10
-                          ? `${order.id.slice(0, 10)}...`
-                          : order.id}
+                        {order.id.slice(0, 8)}...
                       </TableCell>
                       <TableCell className="font-medium">
                         {order.cliente?.name ?? "---"}

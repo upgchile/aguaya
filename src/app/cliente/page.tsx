@@ -20,6 +20,9 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { PRECIO_BIDON } from "@/lib/types";
+import { useAuth } from "@/lib/hooks/use-auth";
+import { createOrder } from "@/lib/actions/order-actions";
+import { toast } from "sonner";
 
 function formatCLP(amount: number): string {
   return `$${amount.toLocaleString("es-CL")}`;
@@ -33,6 +36,7 @@ function getDiscount(qty: number): number {
 
 export default function ClienteOrderPage() {
   const router = useRouter();
+  const { name } = useAuth();
   const [cantidad, setCantidad] = useState(1);
   const [address, setAddress] = useState("");
   const [scheduleMode, setScheduleMode] = useState<"ahora" | "agendar">(
@@ -54,7 +58,12 @@ export default function ClienteOrderPage() {
     setCantidad((prev) => Math.max(prev - 1, 1));
   }, []);
 
-  const handleOrder = (e: React.MouseEvent<HTMLButtonElement>) => {
+  const handleOrder = async (e: React.MouseEvent<HTMLButtonElement>) => {
+    if (!address.trim()) {
+      toast.error("Ingresa una dirección de entrega");
+      return;
+    }
+
     // Ripple effect
     const rect = e.currentTarget.getBoundingClientRect();
     setRipple({
@@ -64,13 +73,23 @@ export default function ClienteOrderPage() {
     setTimeout(() => setRipple(null), 600);
 
     setIsOrdering(true);
-    setTimeout(() => {
+
+    const result = await createOrder({
+      cantidad_bidones: cantidad,
+      address: address.trim(),
+    });
+
+    if (result.error) {
+      toast.error("Error al crear pedido", { description: result.error });
       setIsOrdering(false);
-      setOrderSuccess(true);
-      setTimeout(() => {
-        router.push("/cliente/tracking");
-      }, 2000);
-    }, 1200);
+      return;
+    }
+
+    setIsOrdering(false);
+    setOrderSuccess(true);
+    setTimeout(() => {
+      router.push("/cliente/tracking");
+    }, 2000);
   };
 
   return (
@@ -150,11 +169,11 @@ export default function ClienteOrderPage() {
         className="mb-5"
       >
         <h1 className="text-2xl font-bold text-foreground">
-          Hola Maria!
+          Hola {name || "Cliente"}!
         </h1>
         <div className="mt-1 flex items-center gap-1 text-sm text-muted-foreground">
           <MapPin className="size-3.5 text-primary" />
-          <span>Providencia, Santiago</span>
+          <span>Santiago, Chile</span>
         </div>
       </motion.div>
 
