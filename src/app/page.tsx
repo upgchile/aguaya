@@ -142,7 +142,7 @@ export default function Home() {
               </a>
             ))}
             <Button asChild size="sm" className="rounded-full">
-              <Link href="/cliente">Pedir Ahora</Link>
+              <Link href="/pedir">Pedir Ahora</Link>
             </Button>
           </div>
 
@@ -177,7 +177,7 @@ export default function Home() {
                 </a>
               ))}
               <Button asChild size="sm" className="mt-1 w-full rounded-full">
-                <Link href="/cliente">Pedir Ahora</Link>
+                <Link href="/pedir">Pedir Ahora</Link>
               </Button>
             </div>
           </motion.div>
@@ -242,7 +242,7 @@ export default function Home() {
             transition={{ duration: 0.6, delay: 0.3, ease: "easeOut" as const }}
             className="mt-10 flex justify-center"
           >
-            <Link href="/cliente" className="group relative">
+            <Link href="/pedir" className="group relative">
               {/* Outer pulse ring */}
               <motion.div
                 animate={{ scale: [1, 1.15, 1], opacity: [0.3, 0, 0.3] }}
@@ -284,7 +284,7 @@ export default function Home() {
             className="mt-4"
           >
             <Link
-              href="/cliente"
+              href="/pedir"
               className="inline-flex items-center gap-2 rounded-full border border-border bg-white/60 px-5 py-2.5 text-sm font-medium text-foreground/70 backdrop-blur-sm transition-all hover:border-primary/30 hover:text-primary"
             >
               <CalendarClock className="size-4" />
@@ -470,7 +470,7 @@ export default function Home() {
                   asChild
                   className="mt-8 h-12 w-full rounded-full text-base font-semibold shadow-lg shadow-primary/20"
                 >
-                  <Link href="/cliente">Pedir Ahora</Link>
+                  <Link href="/pedir">Pedir Ahora</Link>
                 </Button>
               </div>
             </div>

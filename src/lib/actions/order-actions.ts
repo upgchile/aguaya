@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache";
 export async function createOrder(data: {
   cantidad_bidones: number;
   address: string;
+  payment_method?: string;
   lat?: number;
   lng?: number;
 }) {
@@ -27,6 +28,7 @@ export async function createOrder(data: {
     total,
     comision_plataforma,
     address: data.address,
+    payment_method: data.payment_method ?? null,
     lat: data.lat ?? null,
     lng: data.lng ?? null,
   });
@@ -34,6 +36,69 @@ export async function createOrder(data: {
   if (error) return { error: error.message };
 
   revalidatePath("/cliente");
+  return { success: true };
+}
+
+export async function createOrderWithAuth(data: {
+  cantidad_bidones: number;
+  address: string;
+  payment_method: string;
+  auth: {
+    mode: "signup" | "signin";
+    email: string;
+    password: string;
+    name?: string;
+    phone?: string;
+  };
+}) {
+  const supabase = await createClient();
+
+  if (data.auth.mode === "signup") {
+    const { error } = await supabase.auth.signUp({
+      email: data.auth.email,
+      password: data.auth.password,
+      options: {
+        data: {
+          name: data.auth.name || "",
+          phone: data.auth.phone
+            ? `+56${data.auth.phone.replace(/\s/g, "")}`
+            : "",
+          role: "cliente",
+        },
+      },
+    });
+    if (error) return { error: error.message };
+  } else {
+    const { error } = await supabase.auth.signInWithPassword({
+      email: data.auth.email,
+      password: data.auth.password,
+    });
+    if (error) return { error: error.message };
+  }
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "Error de autenticación" };
+
+  const precio_unitario = 4500;
+  const comision_plataforma = 500;
+  const total = data.cantidad_bidones * precio_unitario;
+
+  const { error } = await supabase.from("orders").insert({
+    cliente_id: user.id,
+    cantidad_bidones: data.cantidad_bidones,
+    precio_unitario,
+    total,
+    comision_plataforma,
+    address: data.address,
+    payment_method: data.payment_method,
+  });
+
+  if (error) return { error: error.message };
+
+  revalidatePath("/cliente");
+  revalidatePath("/pedir");
   return { success: true };
 }
 

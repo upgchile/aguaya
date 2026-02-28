@@ -11,6 +11,8 @@ export type RepartidorStatus = "disponible" | "ocupado" | "offline";
 
 export type PaymentStatus = "pendiente" | "pagado";
 
+export type PaymentMethod = "efectivo" | "transferencia" | "tarjeta";
+
 export interface User {
   id: string;
   email: string;
@@ -44,6 +46,7 @@ export interface Order {
   lat: number;
   lng: number;
   status: OrderStatus;
+  payment_method?: string;
   scheduled_at?: string;
   accepted_at?: string;
   rating?: number;
